@@ -6,7 +6,9 @@
   "mixins": [
     "ChunkMapMixin",
     "EntityMixin",
-    "sable.PhysicsChunkTicketManagerMixin"
+    "sable.PhysicsChunkTicketManagerMixin",
+    "sable.RapierFlightConnectionsMixin",
+    "sable.RapierFlightDisconnectMixin"
   ],
   "client": [
     "ClientChunkCacheMixin",

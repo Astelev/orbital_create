@@ -49,6 +49,6 @@ final class SableFlightAccess {
         }
         return ship != null && !ship.isRemoved() && HighAltitudePolicy.maySkipTerrainTicket(
                 FlightConfig.ENABLED.getAsBoolean(), level.dimension().equals(Level.OVERWORLD), false,
-                ShipGeometry.currentMinY(ship), level.getMaxBuildHeight(), FlightConfig.MIN_ALTITUDE.getAsInt());
+                ConnectedFlightAssembly.currentMinY(ship), level.getMaxBuildHeight(), FlightConfig.MIN_ALTITUDE.getAsInt());
     }
 }

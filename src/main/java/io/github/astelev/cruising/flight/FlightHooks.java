@@ -89,6 +89,7 @@ public final class FlightHooks {
     @SubscribeEvent
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (event.getLevel() instanceof ServerLevel level) {
+            if(ModList.get().isLoaded("sable"))ConnectedFlightAssembly.clear(level);
             CACHES.remove(level);
             SENT.entrySet().removeIf(entry -> entry.getValue().dimension().equals(level.dimension().location()));
         }

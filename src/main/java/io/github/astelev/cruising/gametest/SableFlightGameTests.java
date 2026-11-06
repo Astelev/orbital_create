@@ -28,6 +28,105 @@ import java.util.UUID;
 /** Registered only in a development runtime with Sable installed. */
 @PrefixGameTestTemplate(false)
 public final class SableFlightGameTests {
+    @GameTest(template="empty",templateNamespace="cruising",timeoutTicks=100)
+    public static void rotaryChildStaysWithOccupiedParentAboveAltitude(GameTestHelper helper) {
+        var level=helper.getLevel();var container=SubLevelContainer.getContainer(level);var system=container.physicsSystem();
+        var pipeline=system.getPipeline();
+        var ships=new java.util.ArrayList<dev.ryanhcode.sable.sublevel.ServerSubLevel>();
+        var joints=new java.util.ArrayList<dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle>();
+        var player=FakePlayerFactory.get(level,new com.mojang.authlib.GameProfile(UUID.randomUUID(),"CruisingJointCrew"));
+        var movement=(dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension)player;
+        boolean listed=level.players().contains(player);
+        try {
+            for(int i=0;i<4;i++) {
+                var anchor=helper.absolutePos(new BlockPos(1+i*4,2,1));level.setBlockAndUpdate(anchor,Blocks.IRON_BLOCK.defaultBlockState());
+                var ship=SubLevelAssemblyHelper.assembleBlocks(level,anchor,List.of(anchor),
+                        new BoundingBox3i(anchor.getX(),anchor.getY(),anchor.getZ(),anchor.getX(),anchor.getY(),anchor.getZ()));
+                ships.add(ship);pipeline.teleport(ship,new Vector3d(1700008+(i==3?4:i*8),400,1700008),ship.logicalPose().orientation());
+                ship.updateBoundingBox();ship.updateLastPose();
+            }
+            var parent=ships.get(0);var child=ships.get(1);var grandchild=ships.get(2);var nearby=ships.get(3);
+            joints.add(rotary(pipeline,parent,child));joints.add(rotary(pipeline,child,grandchild));
+            helper.assertTrue(joints.stream().allMatch(j->j!=null && j.isValid()),"Native rotary constraints were not created");
+            helper.assertTrue(container.collectForceLoadedSubLevels().isEmpty(),"Crew test must not be covered by native force-load tickets");
+            movement.sable$setTrackingSubLevel(parent);player.setPos(1700008,401,1700008);
+            if(!listed)level.players().add(player);
+            helper.assertTrue(!io.github.astelev.cruising.flight.ShipGeometry.isPassenger(child,player),"Crew must be outside child's own hull");
+            helper.assertTrue(FlightHooks.isHighShipEntity(player),"High parent must enable terrain exemption");
+            system.getTicketManager().update(level,container,system,pipeline,1.0/20);
+            helper.assertTrue(!parent.isRemoved(),"Occupied parent unloaded");
+            helper.assertTrue(!child.isRemoved() && !grandchild.isRemoved(),
+                    "Rotary child unloaded when parent passenger stopped keeping terrain loaded above 356");
+            helper.assertTrue(nearby.isRemoved(),"An unrelated nearby ship inherited crew protection");
+
+            pipeline.teleport(grandchild,new Vector3d(1700024,350,1700008),grandchild.logicalPose().orientation());
+            helper.assertTrue(!FlightHooks.isHighShipEntity(player),"Lowest linked hull must end the whole assembly's terrain exemption immediately");
+            system.getTicketManager().update(level,container,system,pipeline,1.0/20);
+            helper.assertTrue(!child.isRemoved() && !grandchild.isRemoved(),"A linked part unloaded during descent before normal terrain loading resumed");
+            helper.assertTrue(level.getChunkSource().getChunkNow(1700008>>4,1700008>>4)!=null,"Descent did not resume native terrain loading");
+            joints.get(1).remove();
+            helper.assertTrue(FlightHooks.isHighShipEntity(player),"Removing a low child did not invalidate assembly membership");
+            joints.add(rotary(pipeline,child,grandchild));
+            helper.assertTrue(!FlightHooks.isHighShipEntity(player),"Reconnecting a low child did not update altitude eligibility");
+            joints.add(rotary(pipeline,parent,child));joints.get(0).remove();
+            helper.assertTrue(!FlightHooks.isHighShipEntity(player),"Removing one of two joints incorrectly disconnected the assembly");
+            for(int i=0;i<3;i++) {
+                var ship=ships.get(i);pipeline.teleport(ship,new Vector3d(1701032+i*8,400,1700008),ship.logicalPose().orientation());
+                ship.updateBoundingBox();ship.updateLastPose();
+            }
+            player.setPos(1701032,401,1700008);joints.get(2).remove();
+            helper.assertTrue(level.getChunkSource().getChunkNow(1701032>>4,1700008>>4)==null,"Detach control terrain must remain unloaded");
+            system.getTicketManager().update(level,container,system,pipeline,1.0/20);
+            helper.assertTrue(!parent.isRemoved() && !child.isRemoved(),"Remaining occupied linked pair unloaded");
+            helper.assertTrue(grandchild.isRemoved(),"Detached unattended child retained artificial protection");
+            helper.succeed();
+        } finally {
+            movement.sable$setTrackingSubLevel(null);movement.sable$setLastTrackingSubLevelID(null);
+            if(!listed)level.players().remove(player);
+            for(var joint:joints)if(joint!=null && joint.isValid())joint.remove();
+            for(var ship:ships)if(container.getSubLevel(ship.getUniqueId())!=null)container.removeSubLevel(ship,SubLevelRemovalReason.REMOVED);
+        }
+    }
+    private static dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle rotary(
+            dev.ryanhcode.sable.api.physics.PhysicsPipeline pipeline,dev.ryanhcode.sable.sublevel.ServerSubLevel first,
+            dev.ryanhcode.sable.sublevel.ServerSubLevel second) {
+        return pipeline.addConstraint(first,second,new dev.ryanhcode.sable.api.physics.constraint.RotaryConstraintConfiguration(
+                jointAnchor(first),jointAnchor(second),new Vector3d(0,1,0),new Vector3d(0,1,0)));
+    }
+    @GameTest(template="empty",templateNamespace="cruising",timeoutTicks=100)
+    public static void nativeForceLoadKeepsWholeRotaryAssembly(GameTestHelper helper) {
+        var level=helper.getLevel();var container=SubLevelContainer.getContainer(level);var system=container.physicsSystem();var pipeline=system.getPipeline();
+        var ships=new java.util.ArrayList<dev.ryanhcode.sable.sublevel.ServerSubLevel>();
+        dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle joint=null;
+        try {
+            for(int i=0;i<2;i++) {
+                var a=helper.absolutePos(new BlockPos(1+i*4,2,1));level.setBlockAndUpdate(a,Blocks.IRON_BLOCK.defaultBlockState());
+                var ship=SubLevelAssemblyHelper.assembleBlocks(level,a,List.of(a),new BoundingBox3i(a.getX(),a.getY(),a.getZ(),a.getX(),a.getY(),a.getZ()));
+                ships.add(ship);pipeline.teleport(ship,new Vector3d(1800008+i*8,400,1800008),ship.logicalPose().orientation());
+                ship.updateBoundingBox();ship.updateLastPose();
+            }
+            var parent=ships.get(0);var child=ships.get(1);joint=rotary(pipeline,parent,child);
+            container.addForceLoadTicket(parent,SubLevelLoadingTicketType.COMMAND_FORCED,Unit.INSTANCE);
+            helper.assertTrue(!container.collectForceLoadedSubLevels().contains(child),"Child must not own a native force-load ticket");
+            pipeline.addLinearAndAngularVelocity(child,new Vector3d(12,3,4),new Vector3d(0.1,0.2,0.3));
+            var linear=pipeline.getLinearVelocity(child,new Vector3d());var angular=pipeline.getAngularVelocity(child,new Vector3d());
+            system.getTicketManager().update(level,container,system,pipeline,1.0/20);
+            helper.assertTrue(!parent.isRemoved() && !child.isRemoved(),"Force-loaded parent lost its rotary child above terrain");
+            helper.assertTrue(level.getChunkSource().getChunkNow(1800008>>4,1800008>>4)==null,"High force-loaded assembly generated terrain");
+            helper.assertTrue(linear.distance(pipeline.getLinearVelocity(child,new Vector3d()))<1e-8
+                    && angular.distance(pipeline.getAngularVelocity(child,new Vector3d()))<1e-8,"Ticket handling changed physics velocity");
+            helper.succeed();
+        } finally {
+            if(!ships.isEmpty())container.removeForceLoadTicket(ships.get(0),SubLevelLoadingTicketType.COMMAND_FORCED,Unit.INSTANCE);
+            if(joint!=null && joint.isValid())joint.remove();
+            for(var ship:ships)if(container.getSubLevel(ship.getUniqueId())!=null)container.removeSubLevel(ship,SubLevelRemovalReason.REMOVED);
+        }
+    }
+
+    private static Vector3d jointAnchor(dev.ryanhcode.sable.sublevel.ServerSubLevel ship) {
+        var b=ship.getPlot().getBoundingBox();return new Vector3d(b.minX()+0.5,b.minY()+0.5,b.minZ()+0.5);
+    }
+
     @GameTest(template = "empty", templateNamespace = "cruising", timeoutTicks = 100)
     public static void nativeTrackedPassengerSurvivesPoseHandoff(GameTestHelper helper) {
         var level = helper.getLevel();

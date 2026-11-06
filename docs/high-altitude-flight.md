@@ -8,7 +8,7 @@ on the server and participating clients; other clients keep normal terrain ticke
 
 ## Behavior
 
-- In the Overworld, the **lowest point of the entire ship** must be strictly
+- In the Overworld, the **lowest point of the entire constraint-connected assembly** must be strictly
   above Y=356. A taller world additionally requires clearance above its build
   height and Sable's vertical collision prediction margin.
 - Sable's own player-inhabited and force-loaded-sublevel decisions determine
@@ -73,7 +73,7 @@ exactly 2.0.6. Other versions require revalidation. The server config is
   or graphical-client performance. Test in a separate world before merging into
   an existing modpack.
 - Only the Overworld is enabled. Flying without a Sable ship does not activate it.
-- Constraint-connected ships, unusual passenger trackers, custom generators and
+- Unusual passenger trackers, custom generators and
   abrupt teleports require manual validation. Teleports and commands that request
   real terrain retain their normal behavior.
 - Distant Horizons remains optional. DH 3.3.3 has a client flight adapter for
@@ -146,3 +146,24 @@ change, on-ground state and velocity. Normal walking/jumping away can also
 produce this record; the record alone does not prove an error. If the standing
 passenger issue persists, the surrounding client log can distinguish loss of
 ship tracking, loss of temporary chunks, and a native collision transition.
+
+## Connected sublevels (1.0.1)
+
+Cruising Speed tracks native Rapier constraints, including the rotary constraints
+used by swivel bearings. A passenger or an existing Sable force-load ticket on
+one member protects its connected sublevels from unloading. Unoccupied,
+unconnected ships retain native unloading behavior. This protection also applies
+during descent; altitude optimization requires every connected hull to clear the
+threshold. Connections to static terrain or unknown body types conservatively
+retain ordinary terrain loading.
+
+Joint addition, removal, native breakage and body/level disposal invalidate the
+connectivity cache. Hull minima and force-load decisions are shared within one
+native ticket update; movement checks outside that update use live poses. No
+persistent force-load tickets are added.
+
+Native GameTests cover an occupied three-body rotary chain, an unrelated nearby
+ship, descent with stale cached bounds, detachment, parallel joints, and a
+force-loaded rotary assembly with unchanged linear/angular velocity. These tests
+exercise the swivel bearing's native constraint backend, rather than its graphical
+block interaction. In-game validation with the reported construction remains useful.
