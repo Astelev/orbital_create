@@ -15,7 +15,9 @@ LOD generation/retrieval/mesh tasks. They also support creative/elytra cameras
 above the configured altitude, without Sable, Create or Aeronautics.
 
 **Sable 2.0.6** additionally enables the existing server/client high-altitude
-ship optimization with temporary air chunks. Create, Aeronautics, AeroWorks and
+ship optimization with temporary air chunks. Connected sublevels, including swivel
+bearing assemblies, share passenger protection and use their lowest hull for
+altitude eligibility. Create, Aeronautics, AeroWorks and
 AeroUtils are not required. The mod registers no blocks, items or creative tabs.
 
 ## Configuration
