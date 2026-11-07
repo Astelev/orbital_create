@@ -26,6 +26,17 @@ public abstract class ProgressiveQueueMixin implements ProgressiveQueueAccess {
     @Shadow @Final private IDhApiWorldGenerator generator;
     @Shadow @Final private IDhServerLevel level;
     @Shadow private DhBlockPos2D generationTargetPos;
+    @Shadow @Final private ConcurrentHashMap<Long,DataSourceRetrievalTask> waitingTaskByPos;
+    @Shadow @Final private java.util.concurrent.ExecutorService queueingThread;
+    @Unique private final java.util.Set<Long> cruising$coveragePositions=ConcurrentHashMap.newKeySet();
+    @Override public void cruising$markPreview(long pos,boolean needed){if(needed)cruising$coveragePositions.add(pos);else cruising$coveragePositions.remove(pos);}
+    @Override public void cruising$previewExecute(Runnable task){queueingThread.execute(task);}
+    @Override public Focus cruising$previewFocus(){var p=generationTargetPos;int radius=Integer.MAX_VALUE;
+        if(level instanceof com.seibel.distanthorizons.core.level.DhClientServerLevel combined){var state=combined.clientside.ClientRenderStateRef.get();if(state==null)return null;radius=state.viewDiameterInBlocks/2;}
+        return p==null?null:new Focus(p.x,p.z,cruising$width(),radius);}
+    @Override public int cruising$previewWaiting(){int floor=Math.min(ProgressivePriority.initialDetail(ProgressiveConfig.INITIAL_DETAIL.getAsInt(),cruising$width()),io.github.astelev.cruising.compat.dh.DhFlightState.minimumDetail());
+        if(floor==0)return waitingTaskByPos.size();int n=0;for(var task:waitingTaskByPos.values())if(DhSectionPos.getDetailLevel(task.pos)-6>=floor)n++;return n;}
+
     @Override public boolean cruising$previewSupported(){return generator instanceof DhWorldGenerator builtin && builtin.roughGenerator!=null && Config.Common.WorldGenerator.generatorPlan.get().surfaceGenEnabled;}
     @Unique private int cruising$width(){var mc=level.getServerLevelWrapper().getWrappedMcObject();if(mc instanceof Level world){return ProgressiveWorldBounds.width(world);}return 0;}
     @Override public boolean cruising$previewAllowed(long pos) {
@@ -41,13 +52,13 @@ public abstract class ProgressiveQueueMixin implements ProgressiveQueueAccess {
             BiFunction<Object,Object,Object> reduce,Operation<Object> original,@Local(argsOnly=true) DhBlockPos2D target) {
         if(!ProgressiveConfig.enabled() || !cruising$previewSupported())return original.call(map,threshold,transform,reduce);
         int initial=ProgressiveConfig.INITIAL_DETAIL.getAsInt(),radius=ProgressiveConfig.RADIUS.getAsInt(),width=cruising$width();
-        int generationFloor=Math.min(initial,io.github.astelev.cruising.compat.dh.DhFlightState.minimumDetail());
+        int generationFloor=Math.min(ProgressivePriority.initialDetail(initial,width),io.github.astelev.cruising.compat.dh.DhFlightState.minimumDetail());
         Function<Map.Entry<Long,DataSourceRetrievalTask>,Object> ranked=entry->{
             int queuedDetail=DhSectionPos.getDetailLevel(entry.getKey())-6;
             if(queuedDetail<generationFloor)return null;
             Object result=transform.apply(entry);if(result instanceof ProgressiveTaskRank pair) {
                 long pos=entry.getKey();int detail=DhSectionPos.getDetailLevel(pos)-6;
-                boolean near=ProgressivePriority.sectionDistance(DhSectionPos.getCenterBlockPosX(pos),DhSectionPos.getCenterBlockPosZ(pos),target.x,target.z,width,DhSectionPos.getBlockWidth(pos))<=radius;
+                boolean near=cruising$coveragePositions.contains(pos) || ProgressivePriority.sectionDistance(DhSectionPos.getCenterBlockPosX(pos),DhSectionPos.getCenterBlockPosZ(pos),target.x,target.z,width,DhSectionPos.getBlockWidth(pos))<=radius;
                 pair.cruising$rank(ProgressivePriority.score(pair.cruising$rank(),detail,initial,near));
             }return result;
         };

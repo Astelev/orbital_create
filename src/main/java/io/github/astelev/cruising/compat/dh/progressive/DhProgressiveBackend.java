@@ -10,8 +10,9 @@ import java.util.function.LongFunction;
 /** Native adapter stays outside mixin classes; source ownership remains entirely with DH. */
 public final class DhProgressiveBackend {
     public static ProgressiveRequests<DataSourceRetrievalResult> create(GeneratedFullDataSourceProvider provider,
-            LongFunction<CompletableFuture<DataSourceRetrievalResult>> enqueue,int limit) {
+            LongFunction<CompletableFuture<DataSourceRetrievalResult>> enqueue,java.util.function.LongConsumer cancel,int limit) {
         return new ProgressiveRequests<>(new ProgressiveRequests.Backend<>() {
+            @Override public void cancelQueued(long pos){cancel.accept(pos);}
             @Override public boolean ready(long pos) {
                 var missing=provider.getPositionsToRetrieve(pos,DhSectionPos.getDetailLevel(pos));
                 return missing!=null && missing.isEmpty();
@@ -22,7 +23,7 @@ public final class DhProgressiveBackend {
                 var result=enqueue.apply(pos);
                 if(result!=null)result.whenComplete((r,e)->{
                     ProgressiveDiagnostics.time("server","progressive.queue_to_result."+(DhSectionPos.getDetailLevel(pos)-6),start);
-                    if(e!=null)ProgressiveDiagnostics.count("server","progressive.failed");
+                    if(e!=null){Throwable cause=e;while(cause instanceof java.util.concurrent.CompletionException && cause.getCause()!=null)cause=cause.getCause();ProgressiveDiagnostics.count("server",cause instanceof java.util.concurrent.CancellationException?"progressive.cancelled":"progressive.failed");}
                 });
                 return result;
             }

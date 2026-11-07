@@ -9,13 +9,34 @@ public final class ProgressiveRequests<R> implements AutoCloseable {
     public interface Backend<R> {
         boolean ready(long pos);
         CompletableFuture<R> enqueue(long pos);
+        default void cancelQueued(long pos){}
     }
     private final Backend<R> backend;
     private final int limit;
     private final Map<Long,CompletableFuture<R>> requests=new HashMap<>();
     private final LinkedHashMap<Long,CompletableFuture<Void>> stages=new LinkedHashMap<>();
     private final LinkedHashSet<Long> published=new LinkedHashSet<>();
+    private final Map<Long,List<Long>> ownership=new HashMap<>();
+    private final Map<Long,Integer> users=new HashMap<>();
     private boolean closed;
+    public synchronized boolean needs(long pos){return users.containsKey(pos);}
+    private void release(long pos,CompletableFuture<R> result) {
+        var orphaned=new ArrayList<Long>();var cancelledStages=new ArrayList<CompletableFuture<Void>>();
+        synchronized(this){
+            if(!requests.remove(pos,result))return;
+            var owned=ownership.remove(pos);if(owned!=null)for(long stage:owned){
+                int remaining=users.getOrDefault(stage,1)-1;
+                if(remaining>0)users.put(stage,remaining);else {
+                    users.remove(stage);orphaned.add(stage);
+                    var barrier=stages.get(stage);
+                    if(barrier!=null && !barrier.isDone()){stages.remove(stage);cancelledStages.add(barrier);}
+                }
+            }
+        }
+        cancelledStages.forEach(f->f.cancel(false));
+        orphaned.forEach(stage->{if(!needs(stage))backend.cancelQueued(stage);});
+    }
+
     public ProgressiveRequests(Backend<R> backend,int limit){this.backend=backend;this.limit=limit;}
     public synchronized boolean canAccept(){return !closed && requests.size()<limit;}
     public synchronized int pending(){return requests.size();}
@@ -27,8 +48,9 @@ public final class ProgressiveRequests<R> implements AutoCloseable {
             var old=requests.get(pos);if(old!=null)return old;
             if(requests.size()>=limit)return null;
             result=new CompletableFuture<>();requests.put(pos,result);
+            var owned=new LinkedHashSet<Long>(path);owned.add(pos);ownership.put(pos,List.copyOf(owned));owned.forEach(p->users.merge(p,1,Integer::sum));
         }
-        result.whenComplete((r,e)->{synchronized(this){requests.remove(pos,result);}});
+        result.whenComplete((r,e)->release(pos,result));
         advance(result,pos,path,0);return result;
     }
     private void advance(CompletableFuture<R> result,long pos,List<Long> path,int index) {
@@ -79,7 +101,7 @@ public final class ProgressiveRequests<R> implements AutoCloseable {
     }
     @Override public void close() {
         List<CompletableFuture<?>> all=new ArrayList<>();
-        synchronized(this){closed=true;all.addAll(requests.values());all.addAll(stages.values());requests.clear();stages.clear();published.clear();}
+        synchronized(this){closed=true;all.addAll(requests.values());all.addAll(stages.values());requests.clear();ownership.clear();users.clear();stages.clear();published.clear();}
         all.forEach(f->f.cancel(false));
     }
 }

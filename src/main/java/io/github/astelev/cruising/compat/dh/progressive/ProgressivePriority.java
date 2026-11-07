@@ -14,5 +14,6 @@ public final class ProgressivePriority {
     public static long sectionDistance(int centerX,int centerZ,int targetX,int targetZ,int worldWidth,int sectionWidth) {
         return Math.max(0,distance(centerX,centerZ,targetX,targetZ,worldWidth)-sectionWidth/2L);
     }
+    public static int initialDetail(int configured,int period){return period<=0?configured:Math.min(configured,Math.max(0,31-Integer.numberOfLeadingZeros(period/2)-6));}
     private ProgressivePriority(){}
 }

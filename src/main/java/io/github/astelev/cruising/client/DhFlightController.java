@@ -5,7 +5,6 @@ import io.github.astelev.cruising.compat.dh.DhFlightConfig;
 import io.github.astelev.cruising.compat.dh.DhFlightState;
 import io.github.astelev.cruising.compat.dh.FallbackBiomeColors;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
@@ -20,8 +19,7 @@ import java.util.Locale;
 public final class DhFlightController {
     private static io.github.astelev.cruising.compat.dh.FlightLodPolicy generationPolicy;
     private static String generationSettings;
-    private static Vec3 lastPosition;
-    private static long lastSampleMillis;
+    private static final io.github.astelev.cruising.compat.dh.FlightMotionSampler motionSampler=new io.github.astelev.cruising.compat.dh.FlightMotionSampler();
     private static long lastLogMillis;
     private static volatile boolean active;
     private static double speed;
@@ -37,19 +35,14 @@ public final class DhFlightController {
                 && (ClientFlightView.isActive(mc.level) || mc.gameRenderer.getMainCamera().getPosition().y > DhFlightConfig.ADAPT_ABOVE_Y.getAsInt());
         if (!active) {
             DhFlightState.publish(false, 0);
-            lastPosition = null;generationPolicy=null;
+            motionSampler.reset();generationPolicy=null;
             return;
         }
         long now = System.nanoTime() / 1_000_000L;
         var position = mc.gameRenderer.getMainCamera().getPosition();
-        speed = lastPosition == null || now <= lastSampleMillis ? 0 : position.distanceTo(lastPosition) * 1000.0 / (now - lastSampleMillis);
-        var travel = position;
-        if (lastPosition != null && now > lastSampleMillis && DhFlightConfig.FORWARD_PRIORITY.getAsBoolean()) {
-            double scale = 1000.0 / (now - lastSampleMillis);
-            DhFlightState.travelVelocity((travel.x - lastPosition.x) * scale, (travel.z - lastPosition.z) * scale);
-        } else DhFlightState.travelVelocity(0, 0);
-        lastPosition = position;
-        lastSampleMillis = now;
+        var motion=motionSampler.sample(position.x,position.y,position.z,now);speed=motion.speed();
+        DhFlightState.travelVelocity(DhFlightConfig.FORWARD_PRIORITY.getAsBoolean()?motion.xVelocity():0,
+                DhFlightConfig.FORWARD_PRIORITY.getAsBoolean()?motion.zVelocity():0);
         String config=DhFlightConfig.COARSE_DETAIL.getAsInt()+":"+DhFlightConfig.FAST_SPEED.get()+":"+DhFlightConfig.QUIET_SECONDS.getAsInt()+":"+DhFlightConfig.REFINE_SECONDS.getAsInt();
         if(generationPolicy==null || !config.equals(generationSettings)) {
             generationSettings=config;generationPolicy=new io.github.astelev.cruising.compat.dh.FlightLodPolicy(

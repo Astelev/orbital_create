@@ -18,4 +18,9 @@ class ProgressivePriorityTest {
         assertEquals(131070,ProgressivePriority.distance(-65535,10,65535,10,0));
         assertEquals(4294967295L,ProgressivePriority.distance(0,Integer.MIN_VALUE,0,Integer.MAX_VALUE,131072));
     }
+    @Test void initialCoverageFitsBothShoresOfSmallWorlds(){
+        assertEquals(3,ProgressivePriority.initialDetail(3,0));assertEquals(3,ProgressivePriority.initialDetail(3,131072));
+        assertEquals(2,ProgressivePriority.initialDetail(3,512));assertEquals(1,ProgressivePriority.initialDetail(3,256));
+    }
+
 }

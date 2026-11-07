@@ -380,3 +380,7 @@ view, native player ticket suspension and no real terrain under the crew. It
 then moves the ship/player through three fresh columns without generating them.
 Native queue regression verifies that fine jobs wait without cancellation,
 resume after leaving cruise, and that ready quadtree detail stays unchanged.
+
+В 1.1.4 добавлен ограниченный резерв грубого покрытия при насыщении очереди,
+очистка ненужных общих стадий и устойчивое измерение скорости камеры.
+Подробности: [dh-preview-reserve-114.md](dh-preview-reserve-114.md).
