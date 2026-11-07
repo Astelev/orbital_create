@@ -23,6 +23,9 @@ public final class FlightCoreSmoke {
             var container=dev.ryanhcode.sable.api.sublevel.SubLevelContainer.getContainer(level);
             container.addForceLoadTicket(ship,dev.ryanhcode.sable.api.sublevel.ticket.SubLevelLoadingTicketType.COMMAND_FORCED,net.minecraft.util.Unit.INSTANCE);
             container.physicsSystem().getPipeline().teleport(ship,new Vector3d(2400008,1000,2400008),ship.logicalPose().orientation());ship.updateBoundingBox();ship.updateLastPose();
+            var worldFrame=container.physicsSystem().getPipeline().addConstraint(null,ship,
+                    new dev.ryanhcode.sable.api.physics.constraint.FreeConstraintConfiguration(ship.logicalPose().position(),ship.logicalPose().rotationPoint(),ship.logicalPose().orientation()));
+            require(worldFrame!=null && worldFrame.isValid(),"Staff-style world frame was not created");
             ((dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension)p).sable$setTrackingSubLevel(ship);
             p.setNoGravity(true);p.setGameMode(net.minecraft.world.level.GameType.CREATIVE);p.getAbilities().flying=true;p.onUpdateAbilities();
             p.connection.teleport(2400008,1001,2400008,0,0);

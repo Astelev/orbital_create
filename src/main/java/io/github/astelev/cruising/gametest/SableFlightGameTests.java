@@ -87,6 +87,38 @@ public final class SableFlightGameTests {
             for(var ship:ships)if(container.getSubLevel(ship.getUniqueId())!=null)container.removeSubLevel(ship,SubLevelRemovalReason.REMOVED);
         }
     }
+    @GameTest(template="empty",templateNamespace="cruising",timeoutTicks=100)
+    public static void worldFrameMotorDoesNotDisableSkyFlight(GameTestHelper helper) {
+        var level=helper.getLevel();var container=SubLevelContainer.getContainer(level);var pipeline=container.physicsSystem().getPipeline();
+        var anchor=helper.absolutePos(new BlockPos(1,2,1));level.setBlockAndUpdate(anchor,Blocks.IRON_BLOCK.defaultBlockState());
+        var ship=SubLevelAssemblyHelper.assembleBlocks(level,anchor,List.of(anchor),new BoundingBox3i(anchor.getX(),anchor.getY(),anchor.getZ(),anchor.getX(),anchor.getY(),anchor.getZ()));
+        dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle joint=null;
+        var crew=FakePlayerFactory.get(level,new com.mojang.authlib.GameProfile(UUID.randomUUID(),"WorldFrameCrew"));
+        try {
+            pipeline.teleport(ship,new Vector3d(2600008,500,2600008),ship.logicalPose().orientation());ship.updateBoundingBox();ship.updateLastPose();
+            ((dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension)crew).sable$setTrackingSubLevel(ship);
+            crew.setPos(2600008,501,2600008);
+            joint=pipeline.addConstraint(null,ship,new dev.ryanhcode.sable.api.physics.constraint.FreeConstraintConfiguration(
+                    new Vector3d(2600008,500,2600008),ship.logicalPose().rotationPoint(),ship.logicalPose().orientation()));
+            helper.assertTrue(joint!=null && joint.isValid(),"World-frame motor joint must be native and valid");
+            helper.assertTrue(FlightHooks.isHighShipEntity(crew),"World-frame control joint incorrectly disabled high-altitude flight");
+            container.addForceLoadTicket(ship,SubLevelLoadingTicketType.COMMAND_FORCED,Unit.INSTANCE);
+            container.physicsSystem().getTicketManager().update(level,container,container.physicsSystem(),pipeline,1.0/20);
+            helper.assertTrue(level.getChunkSource().getChunkNow(2600008>>4,2600008>>4)==null,"World-frame joint forced terrain under a high ship");
+            joint.remove();
+            joint=pipeline.addConstraint(null,ship,new dev.ryanhcode.sable.api.physics.constraint.FixedConstraintConfiguration(
+                    ship.logicalPose().position(),ship.logicalPose().rotationPoint(),ship.logicalPose().orientation()));
+            helper.assertTrue(joint.isValid() && FlightHooks.isHighShipEntity(crew),"Staff lock joint disabled high-altitude flight");
+            pipeline.teleport(ship,new Vector3d(2600008,350,2600008),ship.logicalPose().orientation());
+            helper.assertTrue(!FlightHooks.isHighShipEntity(crew),"World-frame joint must not bypass low-hull terrain safety");
+            helper.succeed();
+        }finally {
+            ((dev.ryanhcode.sable.mixinterface.entity.entity_sublevel_collision.EntityMovementExtension)crew).sable$setTrackingSubLevel(null);
+            if(joint!=null && joint.isValid())joint.remove();
+            container.removeForceLoadTicket(ship,SubLevelLoadingTicketType.COMMAND_FORCED,Unit.INSTANCE);
+            if(!ship.isRemoved())container.removeSubLevel(ship,SubLevelRemovalReason.REMOVED);
+        }
+    }
     private static dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle rotary(
             dev.ryanhcode.sable.api.physics.PhysicsPipeline pipeline,dev.ryanhcode.sable.sublevel.ServerSubLevel first,
             dev.ryanhcode.sable.sublevel.ServerSubLevel second) {
