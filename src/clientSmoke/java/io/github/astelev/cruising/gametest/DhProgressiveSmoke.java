@@ -25,6 +25,7 @@ import java.lang.reflect.Proxy;
 public final class DhProgressiveSmoke {
     private static int ticks;
     @net.neoforged.bus.api.SubscribeEvent public static void tick(net.neoforged.neoforge.client.event.ClientTickEvent.Post event) {
+        if(Boolean.getBoolean("cruising.flightCoreSmoke"))return;
         if(!Boolean.getBoolean("cruising.progressiveSmoke"))return;
         var mc=Minecraft.getInstance();
         if(mc.level==null || mc.player==null || mc.getSingleplayerServer()==null || ++ticks<100)return;
@@ -86,8 +87,13 @@ public final class DhProgressiveSmoke {
                 // Exceed the native parallel-reduction threshold: worker threads must share the captured rank context.
                 for(int i=1;i<=2048;i++){var extra=new DataSourceRetrievalTask(DhSectionPos.encode((byte)6,i,0),(byte)0);waiting.put(extra.pos,extra);}
                 var choose=WorldGenerationQueue.class.getDeclaredMethod("tryStartNextWorldGenTask",DhBlockPos2D.class);choose.setAccessible(true);
+                io.github.astelev.cruising.compat.dh.DhFlightState.publish(true,3);
                 choose.invoke(ranked,new DhBlockPos2D(0,0));
                 require(rough.future.isDone() && !fine.future.isDone(),"Native reduction did not prefer coarse preview");
+                require(!(Boolean)choose.invoke(ranked,new DhBlockPos2D(0,0)),"New fine work started during fast sky flight");
+                require(!fine.future.isDone(),"Deferred fine task was discarded");
+                io.github.astelev.cruising.compat.dh.DhFlightState.publish(false,0);
+                require((Boolean)choose.invoke(ranked,new DhBlockPos2D(0,0)),"Fine work did not resume outside cruise");
                 CruisingSpeed.LOGGER.info("DH_PROGRESSIVE_NATIVE PASS: native provider publishes 8/4/2/1 in order, pooled source ownership retained, native reduction prefers preview with Cruising present");
             } finally {ranked.startClosingAsync(true,true).join();}
         } catch(Exception e){throw new AssertionError("Native DH progressive regression",e);}

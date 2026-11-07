@@ -13,12 +13,14 @@ class DhFlightStateTest {
     @Test
     void flightNeverDowngradesAvailableTerrainDetail() {
         DhFlightState.publish(true, 4);
+        assertEquals(4, DhFlightState.minimumDetail());
         assertEquals(0, DhFlightState.applyDetailFloor((byte) 0));
         assertEquals(6, DhFlightState.applyDetailFloor((byte) 6));
         assertTrue(DhFlightState.bypassMotionPause());
         DhFlightState.publish(false, 0);
         assertEquals(0, DhFlightState.applyDetailFloor((byte) 0));
         assertFalse(DhFlightState.bypassMotionPause());
+        assertEquals(0,DhFlightState.minimumDetail());
     }
 
     @Test

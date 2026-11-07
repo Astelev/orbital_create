@@ -41,7 +41,10 @@ public abstract class ProgressiveQueueMixin implements ProgressiveQueueAccess {
             BiFunction<Object,Object,Object> reduce,Operation<Object> original,@Local(argsOnly=true) DhBlockPos2D target) {
         if(!ProgressiveConfig.enabled() || !cruising$previewSupported())return original.call(map,threshold,transform,reduce);
         int initial=ProgressiveConfig.INITIAL_DETAIL.getAsInt(),radius=ProgressiveConfig.RADIUS.getAsInt(),width=cruising$width();
+        int generationFloor=Math.min(initial,io.github.astelev.cruising.compat.dh.DhFlightState.minimumDetail());
         Function<Map.Entry<Long,DataSourceRetrievalTask>,Object> ranked=entry->{
+            int queuedDetail=DhSectionPos.getDetailLevel(entry.getKey())-6;
+            if(queuedDetail<generationFloor)return null;
             Object result=transform.apply(entry);if(result instanceof ProgressiveTaskRank pair) {
                 long pos=entry.getKey();int detail=DhSectionPos.getDetailLevel(pos)-6;
                 boolean near=ProgressivePriority.sectionDistance(DhSectionPos.getCenterBlockPosX(pos),DhSectionPos.getCenterBlockPosZ(pos),target.x,target.z,width,DhSectionPos.getBlockWidth(pos))<=radius;

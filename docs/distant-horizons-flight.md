@@ -61,10 +61,10 @@ The client config is `config/cruising-client.toml`, section
 | `modifyDistantHorizonsBehavior` | `true` | Allow progressive generation, motion-pause and queue adaptations |
 | `adaptAboveY` | `356` | Camera height for standalone DH flight adaptation |
 | `smoothFallbackTerrain` | `true` | Smooth height transitions; disable for closed stepped tiles |
-| `coarseDetail` | `4` | Legacy setting; no render coarsening or timed refinement |
-| `fastSpeed` | `20.0` | Legacy setting; no render coarsening or timed refinement |
-| `quietSeconds` | `5` | Legacy setting; no render coarsening or timed refinement |
-| `refineSeconds` | `10` | Legacy setting; no render coarsening or timed refinement |
+| `coarseDetail` | `4` | New-generation floor during sky cruise, capped at initialDataDetail; ready render detail is unchanged |
+| `fastSpeed` | `20.0` | Speed that postpones new fine generation |
+| `quietSeconds` | `5` | Quiet delay before admitting finer new work |
+| `refineSeconds` | `10` | Interval for admitting finer new work |
 | `diagnostics` | `true` | F3 status and a log line at most every 30 seconds |
 | `fallbackPlane` | `true` | Draw a temporary surface in DH's terrain pass |
 | `fallbackHeight` | `60` | Height of the temporary plane |
@@ -355,3 +355,28 @@ new settings default automatically. No DH config file is modified.
   spanning beyond its canonical bounds and confirms the old scheduler is off.
 - All 8 native server GameTests pass with Sable and without DH, including connected
   sublevels and high-altitude retention. DH and smoke fixtures are not bundled.
+
+## 1.1.2 flight generation guard
+
+The render floor remains removed. The previous speed/quiet-time policy now
+controls only admission of NEW queued DH work: native queue reduction skips
+tasks finer than the current generation floor, capped at initialDataDetail.
+Waiting tasks stay queued, in-flight tasks finish, and existing LOD data and
+render detail are unchanged. After slowing, finer work resumes progressively;
+leaving sky adaptation clears the guard. This restores a distinction lost in
+1.1.0, when removing render coarsening also allowed immediate fine generation
+during fast sky flight. It is not proof of the exact user's physical loading
+failure; that path needs the new flight eligibility trace.
+
+Every five seconds above Y320, [CRUISING-FLIGHT] records server enable/threshold,
+protocol availability, sky eligibility, tracked/selected ship, live hull and
+connected-assembly minimum Y, external anchors, and Sable terrain tickets
+skipped/allowed. Plot tickets are excluded from the terrain counters and remain
+native. Eligibility is still strict: the entire connected assembly must clear
+the altitude/collision margin; no safety checks were relaxed.
+
+A new real-client Sable fixture verifies protocol negotiation, temporary client
+view, native player ticket suspension and no real terrain under the crew. It
+then moves the ship/player through three fresh columns without generating them.
+Native queue regression verifies that fine jobs wait without cancellation,
+resume after leaving cruise, and that ready quadtree detail stays unchanged.

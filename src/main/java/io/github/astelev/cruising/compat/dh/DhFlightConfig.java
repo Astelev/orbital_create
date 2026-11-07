@@ -31,13 +31,13 @@ public final class DhFlightConfig {
                 .translation("cruising.configuration.adaptAboveY").defineInRange("adaptAboveY",356,-2032,2032);
         SMOOTH_TERRAIN = builder.comment("Smooth neighboring biome height samples. Disable for flat stepped tiles with closed sides.")
                 .translation("cruising.configuration.smoothFallbackTerrain").define("smoothFallbackTerrain",true);
-        COARSE_DETAIL = builder.comment("Legacy setting, retained for configuration compatibility; no longer reduces render detail.",
+        COARSE_DETAIL = builder.comment("Minimum detail for NEW generation during fast sky flight; existing render detail is never reduced.",
                 "Configure generation preview in cruising-common.toml, dhProgressive instead.").translation("cruising.configuration.coarseDetail").defineInRange("coarseDetail", 4, 1, 6);
-        FAST_SPEED = builder.comment("Legacy coarse-mode threshold, no longer used to reduce render detail.")
+        FAST_SPEED = builder.comment("Flight speed that postpones new fine generation; never reduces ready LOD detail.")
                 .translation("cruising.configuration.fastSpeed").defineInRange("fastSpeed", 20.0, 1.0, 1000000.0);
-        QUIET_SECONDS = builder.comment("Legacy render-refinement delay; no longer used.")
+        QUIET_SECONDS = builder.comment("Quiet time before admitting finer new generation.")
                 .translation("cruising.configuration.quietSeconds").defineInRange("quietSeconds", 5, 0, 300);
-        REFINE_SECONDS = builder.comment("Legacy render-refinement interval; no longer used.")
+        REFINE_SECONDS = builder.comment("Interval for admitting finer new generation; ready render quality is unchanged.")
                 .translation("cruising.configuration.refineSeconds").defineInRange("refineSeconds", 10, 1, 300);
         DIAGNOSTICS = builder.comment("Show the flight LOD mode and DH's generation gate in F3.",
                 "Also log a short status at most once every 30 seconds during sky flight.")

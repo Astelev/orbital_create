@@ -29,7 +29,7 @@ public final class DhFlightState {
     }
 
     public static int minimumDetail() {
-        return mode.minimumDetail;
+        return mode.active?mode.minimumDetail:0;
     }
 
     public static void recordGate(boolean allowed, boolean chunkBuilderOverloaded) {

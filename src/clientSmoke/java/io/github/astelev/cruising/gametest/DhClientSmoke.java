@@ -27,6 +27,7 @@ public final class DhClientSmoke {
 
     @SubscribeEvent
     public static void tick(ClientTickEvent.Post event) {
+        if(Boolean.getBoolean("cruising.flightCoreSmoke")){FlightCoreSmoke.bootstrap();return;}
         if (finished || Boolean.getBoolean("cruising.progressiveSmoke")) return;
         var mc = Minecraft.getInstance();
         ticks++;

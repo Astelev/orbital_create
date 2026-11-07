@@ -77,6 +77,7 @@ public final class ConnectedFlightAssembly {
         if(!(ship instanceof ServerSubLevel server))return new Group(List.of(),true,Set.of());
         var graph=GRAPHS.get(server.getLevel());return graph==null?new Group(List.of(server),false,Set.of(server)):graph.group(server);
     }
+    public static String diagnostic(SubLevel ship){var g=group(ship);return "assemblyShips="+g.ships.size()+" externalAnchor="+g.external;}
     public static boolean connected(SubLevel ship){return group(ship).ships.size()>1;}
     public static synchronized double currentMinY(SubLevel ship) {
         var group=group(ship);

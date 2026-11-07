@@ -24,6 +24,9 @@ import java.util.UUID;
 @EventBusSubscriber(modid = CruisingSpeed.MODID)
 public final class FlightHooks {
     private static final Map<Level, TemporaryChunkCache> CACHES = new IdentityHashMap<>();
+    private static final java.util.concurrent.atomic.LongAdder SKY_TICKETS=new java.util.concurrent.atomic.LongAdder(),REAL_TICKETS=new java.util.concurrent.atomic.LongAdder();
+    public static void noteShipTicket(boolean sky){(sky?SKY_TICKETS:REAL_TICKETS).increment();}
+    private static final Map<UUID,Long> NEXT_DIAGNOSTIC=new HashMap<>();
     private static final Map<UUID, TemporaryViewPayload> SENT = new HashMap<>();
 
     private FlightHooks() {
@@ -49,6 +52,12 @@ public final class FlightHooks {
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
+        }
+        if(player.getY()>320 && player.server.getTickCount()>=NEXT_DIAGNOSTIC.getOrDefault(player.getUUID(),0L)) {
+            NEXT_DIAGNOSTIC.put(player.getUUID(),(long)player.server.getTickCount()+100);
+            CruisingSpeed.LOGGER.info("[CRUISING-FLIGHT] xyz=({}, {}, {}) enabled={} threshold={} buildMax={} channel={} skyMode={} shipTerrainTickets[skipped/real]={}/{} {}",
+                    player.getX(),player.getY(),player.getZ(),FlightConfig.ENABLED.getAsBoolean(),FlightConfig.MIN_ALTITUDE.getAsInt(),player.serverLevel().getMaxBuildHeight(),player.connection.hasChannel(TemporaryViewPayload.TYPE),isHighShipEntity(player),SKY_TICKETS.sumThenReset(),REAL_TICKETS.sumThenReset(),
+                    ModList.get().isLoaded("sable")?SableFlightAccess.diagnostic(player):"sable=absent");
         }
         // Client-only rendering installs do not require this server channel.
         // Conversely, never skip a real client's terrain tickets unless it can
@@ -83,7 +92,7 @@ public final class FlightHooks {
 
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        SENT.remove(event.getEntity().getUUID());
+        SENT.remove(event.getEntity().getUUID());NEXT_DIAGNOSTIC.remove(event.getEntity().getUUID());
     }
 
     @SubscribeEvent
@@ -91,6 +100,7 @@ public final class FlightHooks {
         if (event.getLevel() instanceof ServerLevel level) {
             if(ModList.get().isLoaded("sable"))ConnectedFlightAssembly.clear(level);
             CACHES.remove(level);
+            if(level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)){NEXT_DIAGNOSTIC.clear();SKY_TICKETS.reset();REAL_TICKETS.reset();}
             SENT.entrySet().removeIf(entry -> entry.getValue().dimension().equals(level.dimension().location()));
         }
     }
