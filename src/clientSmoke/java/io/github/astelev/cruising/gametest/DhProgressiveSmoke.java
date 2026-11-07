@@ -36,7 +36,7 @@ public final class DhProgressiveSmoke {
             Config.Common.WorldGenerator.generatorPlan.set(EDhApiGeneratorPlan.SURFACE_THEN_CHUNKS);
             ProgressiveConfig.ENABLED.set(true);ProgressiveConfig.INITIAL_DETAIL.set(3);
             var level=SharedApi.getAbstractDhWorld().getLevel(ServerLevelWrapper_neoforge.getWrapper(mc.getSingleplayerServer().overworld()));
-            if(Boolean.getBoolean("cruising.progressiveTerrainSmoke"))verifyRealSurface((IDhServerLevel)level);
+            if(Boolean.getBoolean("cruising.progressiveTerrainSmoke") || Boolean.getBoolean("cruising.profileSmoke"))verifyRealSurface((IDhServerLevel)level);
             verifyNativeDetail(level);
             var submitted=new ArrayList<Long>();var futures=new HashMap<Long,CompletableFuture<DataSourceRetrievalResult>>();
             Object queue=Proxy.newProxyInstance(DhProgressiveSmoke.class.getClassLoader(),new Class[]{IFullDataSourceRetrievalQueue.class,ProgressiveQueueAccess.class},(p,m,a)->switch(m.getName()) {
@@ -97,8 +97,8 @@ public final class DhProgressiveSmoke {
         var generator=new DhWorldGenerator(level);
         var executor=java.util.concurrent.Executors.newSingleThreadExecutor();
         try {
-            long fine=DhSectionPos.encode((byte)6,4,4096);
-            for(int detail=3;detail>=1;detail--) {
+            long fine=DhSectionPos.encode((byte)6,4,4112);
+            for(int detail=3;detail>=(Boolean.getBoolean("cruising.profileSmoke")?0:1);detail--) {
                 long pos=DhSectionPos.convertToDetailLevel(fine,(byte)(6+detail));
                 try(var source=FullDataSourceV2.createEmpty(pos)) {
                     source.setRunApiSetterValidation(generator.runApiValidation());
@@ -111,6 +111,14 @@ public final class DhProgressiveSmoke {
                     require(columns==4096,"Native surface left empty columns at detail "+detail+": "+columns);
                     CruisingSpeed.LOGGER.info("DH_PROGRESSIVE_TERRAIN detail={} width={} columns={} wallMs={}",detail,64<<detail,columns,(System.nanoTime()-start)/1e6);
                 }
+            }
+            if(Boolean.getBoolean("cruising.profileSmoke")) {
+                require(io.github.astelev.cruising.compat.dh.profile.GenerationProfile.observed("dh.step.StepNoise_neoforge"),"Noise stage not profiled");
+                require(io.github.astelev.cruising.compat.dh.profile.GenerationProfile.observed("dh.chunk_to_lod"),"Chunk-to-LOD stage not profiled");
+                require(io.github.astelev.cruising.compat.dh.profile.GenerationProfile.observed("dh_worker.noise_fill"),"DH worker noise CPU not profiled");
+                require(io.github.astelev.cruising.compat.dh.profile.GenerationProfile.observed("dh_worker.biomes"),"DH worker biome CPU not profiled");
+                io.github.astelev.cruising.compat.dh.profile.GenerationProfile.report(true);
+                CruisingSpeed.LOGGER.info("CRUISING_GENERATION_PROFILE PASS: real full generation and phase hooks observed");
             }
             CruisingSpeed.LOGGER.info("DH_PROGRESSIVE_TERRAIN PASS: real native surface generator fills every column at 8/4/2-block detail");
         } finally {executor.shutdownNow();}
@@ -129,7 +137,7 @@ public final class DhProgressiveSmoke {
             var world=Minecraft.getInstance().getSingleplayerServer().overworld();
             int width=io.github.astelev.cruising.compat.dh.progressive.ProgressiveWorldBounds.width(world);
             require(width>0,"Optional topology was not detected in paired fixture");
-            long wide=DhSectionPos.encode((byte)9,0,0);
+            long wide=DhSectionPos.encode((byte)9,(width/2)/512,0);
             require(!io.github.astelev.cruising.compat.dh.progressive.ProgressiveWorldBounds.inside(world,wide),"Cross-boundary preview ancestor allowed");
             var ownership=Class.forName("io.github.astelev.around_planet.progressive.ProgressiveOwnership");
             require((Boolean)ownership.getMethod("cruisingOwnsGeneration").invoke(null),"around_planet did not delegate scheduling");

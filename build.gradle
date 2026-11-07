@@ -192,6 +192,7 @@ if (providers.gradleProperty('dhClientSmoke').isPresent()) {
     neoForge.runs.named('client') {
         programArguments.addAll('--quickPlaySingleplayer', providers.gradleProperty('quickPlayWorld').getOrElse('CruisingSpeed-DH-Smoke'))
         jvmArguments.add('-Xmx4G')
+        if (providers.gradleProperty('chunkProfileSmoke').isPresent()) jvmArguments.addAll('-Dcruising.progressiveSmoke=true','-Dcruising.profileSmoke=true')
         if (providers.gradleProperty('progressiveSmoke').isPresent()) jvmArguments.add('-Dcruising.progressiveSmoke=true')
     }
 }
