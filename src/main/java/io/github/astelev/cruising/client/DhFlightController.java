@@ -3,7 +3,6 @@ package io.github.astelev.cruising.client;
 import io.github.astelev.cruising.CruisingSpeed;
 import io.github.astelev.cruising.compat.dh.DhFlightConfig;
 import io.github.astelev.cruising.compat.dh.DhFlightState;
-import io.github.astelev.cruising.compat.dh.FlightLodPolicy;
 import io.github.astelev.cruising.compat.dh.FallbackBiomeColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
@@ -19,8 +18,6 @@ import java.util.Locale;
 
 @EventBusSubscriber(modid = CruisingSpeed.MODID, value = Dist.CLIENT)
 public final class DhFlightController {
-    private static Settings settings;
-    private static FlightLodPolicy policy;
     private static Vec3 lastPosition;
     private static long lastSampleMillis;
     private static long lastLogMillis;
@@ -39,14 +36,7 @@ public final class DhFlightController {
         if (!active) {
             DhFlightState.publish(false, 0);
             lastPosition = null;
-            policy = null;
             return;
-        }
-        var currentSettings = new Settings(DhFlightConfig.COARSE_DETAIL.getAsInt(), DhFlightConfig.FAST_SPEED.get(),
-                DhFlightConfig.QUIET_SECONDS.getAsInt(), DhFlightConfig.REFINE_SECONDS.getAsInt());
-        if (policy == null || !currentSettings.equals(settings)) {
-            settings = currentSettings;
-            policy = new FlightLodPolicy(settings.detail, settings.speed, settings.quiet * 1000L, settings.refine * 1000L);
         }
         long now = System.nanoTime() / 1_000_000L;
         var position = mc.gameRenderer.getMainCamera().getPosition();
@@ -58,10 +48,10 @@ public final class DhFlightController {
         } else DhFlightState.travelVelocity(0, 0);
         lastPosition = position;
         lastSampleMillis = now;
-        DhFlightState.publish(true, policy.sample(true, speed, now));
+        DhFlightState.publish(true, 0);
         if (DhFlightConfig.DIAGNOSTICS.getAsBoolean() && now - lastLogMillis >= 30_000) {
             lastLogMillis = now;
-            CruisingSpeed.LOGGER.info("Flight LOD: minimum cell={} blocks, cameraSpeed={} blocks/s, DH generation gate={}, {}",
+            CruisingSpeed.LOGGER.info("Flight LOD: native detail ({} block floor), cameraSpeed={} blocks/s, DH generation gate={}, {}",
                     1 << DhFlightState.minimumDetail(), Math.round(speed), DhFlightState.recentGate(), serverTiming());
         }
     }
@@ -69,7 +59,7 @@ public final class DhFlightController {
     @SubscribeEvent
     public static void debugText(CustomizeGuiOverlayEvent.DebugText event) {
         if (active && DhFlightConfig.DIAGNOSTICS.getAsBoolean()) {
-            event.getLeft().add("CruisingSpeed LOD: min cell " + (1 << DhFlightState.minimumDetail())
+            event.getLeft().add("CruisingSpeed LOD: native detail; floor " + (1 << DhFlightState.minimumDetail())
                     + " blocks; DH gate " + DhFlightState.recentGate());
             event.getLeft().add("CruisingSpeed " + serverTiming());
             if (DhFlightConfig.FALLBACK_PLANE.getAsBoolean() && DhFlightConfig.FALLBACK_BIOMES.getAsBoolean()) {
@@ -91,5 +81,4 @@ public final class DhFlightController {
         return String.format(Locale.ROOT, "server avg %.1f ms / p99 %.1f ms (DH limits: 25 / 50)", average, p99);
     }
 
-    private record Settings(int detail, double speed, int quiet, int refine) {}
 }

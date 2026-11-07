@@ -27,7 +27,7 @@ public final class DhClientSmoke {
 
     @SubscribeEvent
     public static void tick(ClientTickEvent.Post event) {
-        if (finished) return;
+        if (finished || Boolean.getBoolean("cruising.progressiveSmoke")) return;
         var mc = Minecraft.getInstance();
         ticks++;
         if (ticks > 2400) throw new AssertionError("CRUISING_SPEED_DH_SMOKE: timeout waiting for the test world");
@@ -63,7 +63,7 @@ public final class DhClientSmoke {
             byte original = (Byte) detail.invoke(tree, 1.0, (byte) 0);
             if (original >= 4) return; // Wait for the first quadtree tick.
             DhFlightState.publish(true, 4);
-            require((Byte) detail.invoke(tree, 1.0, (byte) 0) == 4, "Coarse floor did not apply to real DH quadtree");
+            require((Byte) detail.invoke(tree, 1.0, (byte) 0) == original, "Flight downgraded ready DH terrain");
             DhFlightState.publish(false, 0);
             require((Byte) detail.invoke(tree, 1.0, (byte) 0) == original, "Original detail did not return on exit");
 

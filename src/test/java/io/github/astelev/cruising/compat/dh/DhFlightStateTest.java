@@ -11,9 +11,9 @@ class DhFlightStateTest {
     }
 
     @Test
-    void coarseFloorDoesNotIncreaseFarTerrainDetail() {
+    void flightNeverDowngradesAvailableTerrainDetail() {
         DhFlightState.publish(true, 4);
-        assertEquals(4, DhFlightState.applyDetailFloor((byte) 0));
+        assertEquals(0, DhFlightState.applyDetailFloor((byte) 0));
         assertEquals(6, DhFlightState.applyDetailFloor((byte) 6));
         assertTrue(DhFlightState.bypassMotionPause());
         DhFlightState.publish(false, 0);

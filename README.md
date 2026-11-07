@@ -81,3 +81,8 @@ Optional runtime checks:
 
 `integrationRuntime` adds the pinned Sable/Create/Aeronautics test dependencies;
 they are not bundled in the mod. Development smoke-test code is not in the JAR.
+
+Cruising 1.1.0 переносит прогрессивную генерацию DH из around_planet: грубое
+покрытие 8 → 4 → 2 → 1 без снижения детализации уже готовых LOD. Настройки
+`dhProgressive` находятся в `config/cruising-common.toml`. При совместном
+использовании обновите around_planet до 0.10.1, чтобы исключить двойную очередь.
