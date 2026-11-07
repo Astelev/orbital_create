@@ -8,7 +8,18 @@
     "EntityMixin",
     "sable.PhysicsChunkTicketManagerMixin",
     "sable.RapierFlightConnectionsMixin",
-    "sable.RapierFlightDisconnectMixin"
+    "sable.RapierFlightDisconnectMixin",
+    "dh.ProgressiveTaskRankMixin",
+    "dh.ProgressiveQueueMixin",
+    "dh.ProgressiveProviderMixin",
+    "dh.GenerationStepsProfileMixin",
+    "dh.GenerationBatchProfileMixin",
+    "dh.GenerationDiskProfileMixin",
+    "dh.GenerationLodProfileMixin",
+    "dh.GenerationLightProfileMixin",
+    "dh.GenerationRoughProfileMixin",
+    "dh.GenerationQueueProfileMixin",
+    "dh.GenerationWorkerProfileMixin"
   ],
   "client": [
     "ClientChunkCacheMixin",

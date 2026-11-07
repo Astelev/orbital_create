@@ -25,12 +25,11 @@ public final class DhFlightState {
     }
 
     public static byte applyDetailFloor(byte original) {
-        var snapshot = mode;
-        return snapshot.active ? (byte) Math.max(original, snapshot.minimumDetail) : original;
+        return original; // Generation preview must never reduce available render detail.
     }
 
     public static int minimumDetail() {
-        return mode.minimumDetail;
+        return mode.active?mode.minimumDetail:0;
     }
 
     public static void recordGate(boolean allowed, boolean chunkBuilderOverloaded) {

@@ -24,11 +24,11 @@ public final class ConnectedFlightAssembly {
         Group group(ServerSubLevel ship) {
             var cached=groups.get(ship);if(cached!=null)return cached;
             var adjacent=new IdentityHashMap<PhysicsPipelineBody,List<PhysicsPipelineBody>>();
-            var anchors=Collections.newSetFromMap(new IdentityHashMap<PhysicsPipelineBody,Boolean>());
             for(var link:links.values()) {
                 var a=link.first;var b=link.second;
-                if(a==null){if(b!=null)anchors.add(b);continue;}
-                if(b==null){anchors.add(a);continue;}
+                // A null endpoint is a world-space joint frame, not a physical body.
+                // Tool/servo motors use it too. It has no hull that could intersect terrain.
+                if(a==null || b==null)continue;
                 adjacent.computeIfAbsent(a,ignored->new ArrayList<>()).add(b);
                 adjacent.computeIfAbsent(b,ignored->new ArrayList<>()).add(a);
             }
@@ -38,7 +38,6 @@ public final class ConnectedFlightAssembly {
             while(!queue.isEmpty()) {
                 var body=queue.removeFirst();
                 if(body instanceof ServerSubLevel member)members.add(member);else external=true;
-                external|=anchors.contains(body);
                 for(var next:adjacent.getOrDefault(body,List.of()))if(visited.add(next))queue.addLast(next);
             }
             var group=new Group(List.copyOf(members),external,visited);
@@ -76,6 +75,11 @@ public final class ConnectedFlightAssembly {
     private static synchronized Group group(SubLevel ship) {
         if(!(ship instanceof ServerSubLevel server))return new Group(List.of(),true,Set.of());
         var graph=GRAPHS.get(server.getLevel());return graph==null?new Group(List.of(server),false,Set.of(server)):graph.group(server);
+    }
+    public static synchronized String diagnostic(SubLevel ship){
+        var g=group(ship);var graph=GRAPHS.get(ship.getLevel());int frames=0;
+        if(graph!=null)for(var l:graph.links.values())if(l.first==null && g.bodies.contains(l.second) || l.second==null && g.bodies.contains(l.first))frames++;
+        return "assemblyShips="+g.ships.size()+" externalAnchor="+g.external+" worldFrameJoints="+frames;
     }
     public static boolean connected(SubLevel ship){return group(ship).ships.size()>1;}
     public static synchronized double currentMinY(SubLevel ship) {

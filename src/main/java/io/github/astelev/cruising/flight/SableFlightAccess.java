@@ -13,6 +13,15 @@ final class SableFlightAccess {
     private SableFlightAccess() {
     }
 
+    static String diagnostic(Entity entity) {
+        if(!(entity.level() instanceof ServerLevel level))return "side=client";
+        var container=SubLevelContainer.getContainer(level);SubLevel selected=Sable.HELPER.getTrackingSubLevel(entity);
+        var tracked=selected;
+        if(selected==null && container!=null)for(var candidate:container.getAllSubLevels())if(!candidate.isRemoved() && ShipGeometry.isPassenger(candidate,entity)){selected=candidate;break;}
+        return "tracked="+(tracked==null?"none":tracked.getUniqueId())+" selected="+(selected==null?"none":selected.getUniqueId())
+                +" ships="+(container==null?0:container.getAllSubLevels().size())
+                +(selected==null?"":" hullMinY="+ShipGeometry.currentMinY(selected)+" assemblyMinY="+ConnectedFlightAssembly.currentMinY(selected)+" connected="+ConnectedFlightAssembly.connected(selected)+" "+ConnectedFlightAssembly.diagnostic(selected));
+    }
     static boolean isHighShipEntity(Entity entity) {
         if (!(entity.level() instanceof ServerLevel level)
                 || entity.getY() <= FlightConfig.MIN_ALTITUDE.getAsInt()) {

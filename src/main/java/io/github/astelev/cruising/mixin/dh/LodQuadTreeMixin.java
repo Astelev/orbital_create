@@ -1,7 +1,5 @@
 package io.github.astelev.cruising.mixin.dh;
 
-import com.llamalad7.mixinextras.injector.ModifyReturnValue;
-import io.github.astelev.cruising.compat.dh.DhFlightState;
 import io.github.astelev.cruising.compat.dh.DhGenerationPriority;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Coerce;
@@ -14,11 +12,6 @@ import org.spongepowered.asm.mixin.injection.At;
 @Pseudo
 @Mixin(targets = "com.seibel.distanthorizons.core.render.QuadTree.LodQuadTree", remap = false)
 public abstract class LodQuadTreeMixin {
-    @ModifyReturnValue(method = "calcDetailLevelFromDistance(DB)B", at = @At("RETURN"))
-    private byte cruising$coarseFlightDetail(byte original) {
-        return DhFlightState.applyDetailFloor(original);
-    }
-
     @Inject(method = {"loadQueuedSections", "startQueuedRetrievalTasks"}, at = @At("HEAD"))
     private void cruising$snapshotTravel(CallbackInfo ci) {
         DhGenerationPriority.beginSort();

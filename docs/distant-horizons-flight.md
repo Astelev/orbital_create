@@ -7,22 +7,47 @@ Sable, Create or Aeronautics; a server-authorized Sable sky view also qualifies.
 of the biome surface. The surface works throughout the Overworld, including
 normal ground-level play. Sable's server-side temporary-chunk support is optional.
 
-## Coarse first, refine after slowing
+## Progressive generation; native render detail
 
-During fast flight, the nearest LOD cells are at least 16 blocks wide by default.
-DH's normal quadtree requests and renders that coarse data; farther, already
-coarser levels stay coarse. Native DH data generation, storage, lighting and
-mesh building still perform the actual work. No empty terrain is submitted as
-generated DH data, and no DH settings are overwritten.
+Since 1.1.0, Cruising no longer imposes a coarse floor on DH's rendering tree.
+Ready terrain keeps DH's normal distance/quality selection, even during fast
+flight. Unavailable terrain is generated through shared 8→4→2→1 block surface
+stages. Native data ownership, merging and parent retention remain with DH.
+Progressive generation works near the ground too; flight altitude only controls
+motion-pause bypass and travel-priority adaptations.
 
-After five seconds below 20 blocks/second, the minimum cell width drops from
-16 to 8 blocks. It then drops to 4, 2 and 1 at ten-second intervals. Native
-quality settings remain a lower bound on quality: the adapter never asks for
-finer LODs than the user normally requested. Resuming fast flight immediately
-returns to the coarse floor. Leaving sky mode restores ordinary behavior.
+The new `config/cruising-common.toml` contains:
+
+```toml
+[dhProgressive]
+enabled = true
+initialDataDetail = 3
+previewRadiusBlocks = 1024
+maxDeferredRequests = 128
+```
+
+Restart after changes. `initialDataDetail` is 1..4 (2..16-block columns), radius
+128..4096 blocks, deferred limit 16..512. Existing surface stages are shared;
+refinement starts after native publication. This improves first coverage, while
+extra rough stages may add total generator work. It does not cache every noise
+sample or reuse full chunk-generation intermediates. CHUNKS_ONLY, custom/API
+generators and remote queues retain the native path. The client master/modify-DH
+switches also disable the progressive adapter locally; the common switch applies
+on dedicated servers as well. DH remains optional and is never bundled.
+
+With around_planet 0.10.1+, Cruising owns scheduling even when disabled, so the
+legacy experiment cannot start a second queue. Install both updated JARs together
+if using the previous around_planet experimental version. Optional topology
+lookup preserves periodic X priority and avoids ancestor sources crossing the
+canonical seam. Neither mod becomes a required dependency of the other.
+
+Bounded `[CRUISING-PROGRESSIVE]` counters report stage submissions/publications,
+queue selection and queue-to-result wall time every 30 seconds during work.
+These wall times include waiting, not only generation CPU time. For an A/B test,
+compare fresh regions at the same seed/settings and leave the game unpaused.
 
 DH's `pauseIfMovingQuickly` gate is bypassed only during this sky view, including
-the stationary refinement period. Its generation-plan setting, server-load
+stationary flight. Its generation-plan setting, server-load
 protection and queue backpressure remain in force. Use `SURFACE_THEN_CHUNKS` or
 `SURFACE_ONLY` to benefit from rough surface generation; `CHUNKS_ONLY` still
 requires the chunk generator and `DISABLED` remains disabled.
@@ -33,13 +58,13 @@ The client config is `config/cruising-client.toml`, section
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | `true` | Master switch for client integration and surface |
-| `modifyDistantHorizonsBehavior` | `true` | Allow DH detail, motion-pause and queue adaptations |
+| `modifyDistantHorizonsBehavior` | `true` | Allow progressive generation, motion-pause and queue adaptations |
 | `adaptAboveY` | `356` | Camera height for standalone DH flight adaptation |
 | `smoothFallbackTerrain` | `true` | Smooth height transitions; disable for closed stepped tiles |
-| `coarseDetail` | `4` | Cruise cell width is `2^value` blocks |
-| `fastSpeed` | `20.0` | Speed that restarts coarse mode, blocks/second |
-| `quietSeconds` | `5` | Delay before the first refinement |
-| `refineSeconds` | `10` | Time between later refinements |
+| `coarseDetail` | `4` | New-generation floor during sky cruise, capped at initialDataDetail; ready render detail is unchanged |
+| `fastSpeed` | `20.0` | Speed that postpones new fine generation |
+| `quietSeconds` | `5` | Quiet delay before admitting finer new work |
+| `refineSeconds` | `10` | Interval for admitting finer new work |
 | `diagnostics` | `true` | F3 status and a log line at most every 30 seconds |
 | `fallbackPlane` | `true` | Draw a temporary surface in DH's terrain pass |
 | `fallbackHeight` | `60` | Height of the temporary plane |
@@ -315,3 +340,47 @@ uses the neutral base plane instead of biome-height estimates.
 Replace the old AeroSpace JAR rather than loading both versions. Old
 `aerospace-client.toml` settings can be copied into the new filename manually;
 new settings default automatically. No DH config file is modified.
+
+## 1.1.0 validation
+
+- 48 unit tests pass, including copied publication/cancellation/retry/priority
+  regressions and unchanged render detail during active flight.
+- Native DH 3.3.3 client passes alone, then with around_planet 0.10.1, Sodium
+  0.8.13, Sable 2.0.6, Create and Fabric Biome API: shared 8/4/2/1 publication,
+  priority over 2048+ waiting tasks, and disabled-mode native bypass.
+- Real quadtree distance/detail queries at 1, 100, 1000 and 10000 blocks return
+  the same values with flight active and inactive. The global render-floor hook
+  was removed, rather than scheduling regeneration of already available LODs.
+- Paired fixture detects the active 512-block circumference, rejects an ancestor
+  spanning beyond its canonical bounds and confirms the old scheduler is off.
+- All 8 native server GameTests pass with Sable and without DH, including connected
+  sublevels and high-altitude retention. DH and smoke fixtures are not bundled.
+
+## 1.1.2 flight generation guard
+
+The render floor remains removed. The previous speed/quiet-time policy now
+controls only admission of NEW queued DH work: native queue reduction skips
+tasks finer than the current generation floor, capped at initialDataDetail.
+Waiting tasks stay queued, in-flight tasks finish, and existing LOD data and
+render detail are unchanged. After slowing, finer work resumes progressively;
+leaving sky adaptation clears the guard. This restores a distinction lost in
+1.1.0, when removing render coarsening also allowed immediate fine generation
+during fast sky flight. It is not proof of the exact user's physical loading
+failure; that path needs the new flight eligibility trace.
+
+Every five seconds above Y320, [CRUISING-FLIGHT] records server enable/threshold,
+protocol availability, sky eligibility, tracked/selected ship, live hull and
+connected-assembly minimum Y, external anchors, and Sable terrain tickets
+skipped/allowed. Plot tickets are excluded from the terrain counters and remain
+native. Eligibility is still strict: the entire connected assembly must clear
+the altitude/collision margin; no safety checks were relaxed.
+
+A new real-client Sable fixture verifies protocol negotiation, temporary client
+view, native player ticket suspension and no real terrain under the crew. It
+then moves the ship/player through three fresh columns without generating them.
+Native queue regression verifies that fine jobs wait without cancellation,
+resume after leaving cruise, and that ready quadtree detail stays unchanged.
+
+В 1.1.4 добавлен ограниченный резерв грубого покрытия при насыщении очереди,
+очистка ненужных общих стадий и устойчивое измерение скорости камеры.
+Подробности: [dh-preview-reserve-114.md](dh-preview-reserve-114.md).
