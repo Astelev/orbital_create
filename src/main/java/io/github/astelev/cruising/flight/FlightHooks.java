@@ -25,6 +25,14 @@ import java.util.UUID;
 public final class FlightHooks {
     private static final Map<Level, TemporaryChunkCache> CACHES = new IdentityHashMap<>();
     private static final java.util.concurrent.atomic.LongAdder SKY_TICKETS=new java.util.concurrent.atomic.LongAdder(),REAL_TICKETS=new java.util.concurrent.atomic.LongAdder();
+    private static final java.util.concurrent.atomic.LongAdder HOLDING_PROTECTED=new java.util.concurrent.atomic.LongAdder();
+    public static void noteHoldingProtection(){HOLDING_PROTECTED.increment();}
+    private static final Map<Level,long[]> REMOVAL_WINDOWS=new java.util.WeakHashMap<>();
+    public static synchronized void noteNativeRemoval(Level level,UUID id,double y,String reason){
+        if(y<=320)return;long tick=level.getGameTime();var w=REMOVAL_WINDOWS.computeIfAbsent(level,k->new long[]{tick,0});
+        if(tick<w[0] || tick-w[0]>=100){w[0]=tick;w[1]=0;}
+        if(w[1]++<8)CruisingSpeed.LOGGER.info("[CRUISING-NATIVE-REMOVE] side={} ship={} y={} reason={}",level.isClientSide?"client":"server",id,y,reason);
+    }
     public static void noteShipTicket(boolean sky){(sky?SKY_TICKETS:REAL_TICKETS).increment();}
     private static final Map<UUID,Long> NEXT_DIAGNOSTIC=new HashMap<>();
     private static final Map<UUID, TemporaryViewPayload> SENT = new HashMap<>();
@@ -55,8 +63,8 @@ public final class FlightHooks {
         }
         if(player.getY()>320 && player.server.getTickCount()>=NEXT_DIAGNOSTIC.getOrDefault(player.getUUID(),0L)) {
             NEXT_DIAGNOSTIC.put(player.getUUID(),(long)player.server.getTickCount()+100);
-            CruisingSpeed.LOGGER.info("[CRUISING-FLIGHT] xyz=({}, {}, {}) enabled={} threshold={} buildMax={} channel={} skyMode={} shipTerrainTickets[skipped/real]={}/{} {}",
-                    player.getX(),player.getY(),player.getZ(),FlightConfig.ENABLED.getAsBoolean(),FlightConfig.MIN_ALTITUDE.getAsInt(),player.serverLevel().getMaxBuildHeight(),player.connection.hasChannel(TemporaryViewPayload.TYPE),isHighShipEntity(player),SKY_TICKETS.sumThenReset(),REAL_TICKETS.sumThenReset(),
+            CruisingSpeed.LOGGER.info("[CRUISING-FLIGHT] xyz=({}, {}, {}) enabled={} threshold={} buildMax={} channel={} skyMode={} shipTerrainTickets[skipped/real]={}/{} holdingProtected={} mounted={} vehicle={} {}",
+                    player.getX(),player.getY(),player.getZ(),FlightConfig.ENABLED.getAsBoolean(),FlightConfig.MIN_ALTITUDE.getAsInt(),player.serverLevel().getMaxBuildHeight(),player.connection.hasChannel(TemporaryViewPayload.TYPE),isHighShipEntity(player),SKY_TICKETS.sumThenReset(),REAL_TICKETS.sumThenReset(),HOLDING_PROTECTED.sumThenReset(),player.isPassenger(),player.getVehicle()==null?"none":player.getVehicle().getType().toString(),
                     ModList.get().isLoaded("sable")?SableFlightAccess.diagnostic(player):"sable=absent");
         }
         // Client-only rendering installs do not require this server channel.
@@ -100,7 +108,7 @@ public final class FlightHooks {
         if (event.getLevel() instanceof ServerLevel level) {
             if(ModList.get().isLoaded("sable"))ConnectedFlightAssembly.clear(level);
             CACHES.remove(level);
-            if(level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)){NEXT_DIAGNOSTIC.clear();SKY_TICKETS.reset();REAL_TICKETS.reset();}
+            if(level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)){NEXT_DIAGNOSTIC.clear();SKY_TICKETS.reset();REAL_TICKETS.reset();HOLDING_PROTECTED.reset();}
             SENT.entrySet().removeIf(entry -> entry.getValue().dimension().equals(level.dimension().location()));
         }
     }

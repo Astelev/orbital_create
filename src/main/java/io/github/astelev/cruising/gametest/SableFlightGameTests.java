@@ -29,6 +29,43 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class SableFlightGameTests {
     @GameTest(template="empty",templateNamespace="cruising",timeoutTicks=100)
+    public static void retiringTerrainColumnKeepsSeatedRotaryAssemblyButUnloadsUnoccupiedBody(GameTestHelper helper) throws Exception {
+        var level=helper.getLevel();var c=SubLevelContainer.getContainer(level);var pipeline=c.physicsSystem().getPipeline();
+        var ships=new java.util.ArrayList<dev.ryanhcode.sable.sublevel.ServerSubLevel>();
+        dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle joint=null;net.minecraft.world.entity.Entity seat=null,rider=null;
+        var crew=FakePlayerFactory.get(level,new com.mojang.authlib.GameProfile(UUID.randomUUID(),"CruisingHoldingCrew"));boolean listed=level.players().contains(crew);
+        try {
+            for(int i=0;i<3;i++){var pos=helper.absolutePos(new BlockPos(1+i*3,2,1));level.setBlockAndUpdate(pos,Blocks.IRON_BLOCK.defaultBlockState());
+                var ship=SubLevelAssemblyHelper.assembleBlocks(level,pos,List.of(pos),new BoundingBox3i(pos.getX(),pos.getY(),pos.getZ(),pos.getX(),pos.getY(),pos.getZ()));ships.add(ship);
+                pipeline.teleport(ship,new Vector3d(2800003+i*4,1500,2800008),ship.logicalPose().orientation());ship.updateBoundingBox();ship.updateLastPose();}
+            var owner=ships.get(0);var child=ships.get(1);var unrelated=ships.get(2);joint=rotary(pipeline,owner,child);
+            var b=owner.getPlot().getBoundingBox();var seatPos=new BlockPos(b.minX(),b.minY()+1,b.minZ());
+            level.setBlockAndUpdate(seatPos,net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(net.minecraft.resources.ResourceLocation.parse("create:white_seat")).defaultBlockState());
+            seat=(net.minecraft.world.entity.Entity)Class.forName("com.simibubi.create.content.contraptions.actors.seat.SeatEntity").getConstructor(net.minecraft.world.level.Level.class).newInstance(level);
+            seat.setPos(seatPos.getX()+.5,seatPos.getY(),seatPos.getZ()+.5);level.addFreshEntity(seat);
+            crew.setPos(2800003,1501,2800008);if(!listed)level.players().add(crew);
+            // FakePlayer deliberately refuses startRiding; use a native seated pig and standing crew here.
+            rider=net.minecraft.world.entity.EntityType.PIG.create(level);rider.setPos(2800003,1501,2800008);level.addFreshEntity(rider);rider.startRiding(seat,true);
+            helper.assertTrue(rider.getVehicle()==seat && !seat.isRemoved() && joint.isValid(),"Fixture invalid before retirement: mounted="+(rider.getVehicle()==seat)+" seatRemoved="+seat.isRemoved()+" joint="+joint.isValid());
+            helper.assertTrue(c.collectForceLoadedSubLevels().isEmpty(),"Fixture has persistent load tickets");
+            helper.assertTrue(io.github.astelev.cruising.flight.ConnectedFlightAssembly.protectOccupied(child),"Plot-local seat did not protect the rotary group");
+            var map=c.getHoldingChunkMap();var type=map.getClass();var column=new ChunkPos(2800008>>4,2800008>>4);
+            var create=type.getDeclaredMethod("getOrLoadHoldingChunk",ChunkPos.class,boolean.class);create.setAccessible(true);create.invoke(map,column,true);
+            var unload=type.getDeclaredMethod("processUnload",ChunkPos.class,java.util.Collection.class);unload.setAccessible(true);unload.invoke(map,column,List.of());
+            helper.assertTrue(c.getSubLevel(owner.getUniqueId())==owner && c.getSubLevel(child.getUniqueId())==child && !owner.isRemoved() && !child.isRemoved(),"Terrain retirement removed an occupied native assembly");
+            helper.assertTrue(rider.getVehicle()==seat && !seat.isRemoved() && joint.isValid(),"Terrain retirement lost native seat or joint: mounted="+(rider.getVehicle()==seat)+" seatRemoved="+seat.isRemoved()+" joint="+joint.isValid());
+            helper.assertTrue(c.getSubLevel(unrelated.getUniqueId())==null && map.getHoldingSubLevel(unrelated.getUniqueId())!=null,"Unoccupied nearby object inherited protection or unload path was not exercised");
+            helper.assertTrue(level.getChunkSource().getChunkNow(column.x,column.z)==null && c.collectForceLoadedSubLevels().isEmpty(),"Protection loaded terrain or added persistent tickets");
+            // No sticky crew lease: the same object may retire normally after dismount.
+            rider.stopRiding();crew.setPos(2801000,1501,2801000);joint.remove();joint=null;
+            unload.invoke(map,column,List.of());helper.assertTrue(c.getSubLevel(owner.getUniqueId())==null,"Dismounted assembly remained pinned");helper.succeed();
+        }finally {
+            if(rider!=null)rider.discard();crew.stopRiding();if(seat!=null)seat.discard();if(!listed)level.players().remove(crew);if(joint!=null && joint.isValid())joint.remove();
+            for(var ship:ships){var live=c.getSubLevel(ship.getUniqueId());if(live!=null)c.removeSubLevel(live,SubLevelRemovalReason.REMOVED);else{var held=c.getHoldingChunkMap().getHoldingSubLevel(ship.getUniqueId());if(held!=null){c.getHoldingChunkMap().loadHoldingSubLevel(held);live=c.getSubLevel(ship.getUniqueId());if(live!=null)c.removeSubLevel(live,SubLevelRemovalReason.REMOVED);}}}
+        }
+    }
+
+    @GameTest(template="empty",templateNamespace="cruising",timeoutTicks=100)
     public static void rotaryChildStaysWithOccupiedParentAboveAltitude(GameTestHelper helper) {
         var level=helper.getLevel();var container=SubLevelContainer.getContainer(level);var system=container.physicsSystem();
         var pipeline=system.getPipeline();

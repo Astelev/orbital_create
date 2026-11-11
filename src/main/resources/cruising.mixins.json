@@ -7,6 +7,8 @@
     "ChunkMapMixin",
     "EntityMixin",
     "sable.PhysicsChunkTicketManagerMixin",
+    "sable.HoldingChunkUnloadMixin",
+    "sable.SubLevelRemovalDiagnosticMixin",
     "sable.RapierFlightConnectionsMixin",
     "sable.RapierFlightDisconnectMixin",
     "dh.ProgressiveTaskRankMixin",

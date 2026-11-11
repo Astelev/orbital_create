@@ -93,6 +93,14 @@ public final class ConnectedFlightAssembly {
         }
         return HighAltitudePolicy.mayCruise(momentum/mass);
     }
+    /** Keep occupied sky assemblies native when their ordinary terrain holding column retires.
+     * This is a transient unload decision, not a terrain or persistent force-load ticket. */
+    public static boolean protectOccupied(ServerSubLevel ship) {
+        var level=ship.getLevel();
+        if(!FlightConfig.ENABLED.getAsBoolean() || ship.isRemoved() || !level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD)
+                || !HighAltitudePolicy.maySkipTerrainTicket(true,true,false,currentMinY(ship),level.getMaxBuildHeight(),FlightConfig.MIN_ALTITUDE.getAsInt()))return false;
+        return level.players().stream().anyMatch(player->hasPassenger(ship,player));
+    }
     public static boolean connected(SubLevel ship){return group(ship).ships.size()>1;}
     public static synchronized double currentMinY(SubLevel ship) {
         var group=group(ship);
