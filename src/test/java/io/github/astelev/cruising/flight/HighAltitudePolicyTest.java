@@ -6,6 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HighAltitudePolicyTest {
+    @Test
+    void descendingShipsRequireRealChunksEvenHighAboveTerrain() {
+        assertFalse(HighAltitudePolicy.mayCruise(-20));
+        assertFalse(HighAltitudePolicy.mayCruise(-.001));
+        assertTrue(HighAltitudePolicy.mayCruise(0));
+        assertTrue(HighAltitudePolicy.mayCruise(100));
+        assertFalse(HighAltitudePolicy.mayCruise(Double.NaN));
+        assertFalse(HighAltitudePolicy.mayCruise(Double.POSITIVE_INFINITY));
+    }
+
     private boolean eligible(double lowestPoint) {
         return HighAltitudePolicy.maySkipTerrainTicket(true, true, false, lowestPoint, 320, 356);
     }

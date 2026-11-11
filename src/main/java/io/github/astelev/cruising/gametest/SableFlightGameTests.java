@@ -105,6 +105,12 @@ public final class SableFlightGameTests {
             container.addForceLoadTicket(ship,SubLevelLoadingTicketType.COMMAND_FORCED,Unit.INSTANCE);
             container.physicsSystem().getTicketManager().update(level,container,container.physicsSystem(),pipeline,1.0/20);
             helper.assertTrue(level.getChunkSource().getChunkNow(2600008>>4,2600008>>4)==null,"World-frame joint forced terrain under a high ship");
+            pipeline.addLinearAndAngularVelocity(ship,new Vector3d(0,-20,0),new Vector3d());
+            helper.assertTrue(!FlightHooks.isHighShipEntity(crew),"Descending ship still disabled player terrain loading");
+            container.physicsSystem().getTicketManager().update(level,container,container.physicsSystem(),pipeline,1.0/20);
+            helper.assertTrue(level.getChunkSource().getChunkNow(2600008>>4,2600008>>4)!=null,"Descending high ship still skipped native terrain tickets");
+            pipeline.addLinearAndAngularVelocity(ship,new Vector3d(0,20,0),new Vector3d());
+            helper.assertTrue(FlightHooks.isHighShipEntity(crew),"Stopping descent did not restore cruise eligibility");
             joint.remove();
             joint=pipeline.addConstraint(null,ship,new dev.ryanhcode.sable.api.physics.constraint.FixedConstraintConfiguration(
                     ship.logicalPose().position(),ship.logicalPose().rotationPoint(),ship.logicalPose().orientation()));

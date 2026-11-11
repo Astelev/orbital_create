@@ -95,7 +95,7 @@ public abstract class PhysicsChunkTicketManagerMixin {
             return;
         }
 
-        if (HighAltitudePolicy.maySkipTerrainTicket(
+        if (ConnectedFlightAssembly.notDescending(ship) && HighAltitudePolicy.maySkipTerrainTicket(
                 FlightConfig.ENABLED.getAsBoolean(),
                 level.dimension().equals(Level.OVERWORLD),
                 container.inBounds(x, z),

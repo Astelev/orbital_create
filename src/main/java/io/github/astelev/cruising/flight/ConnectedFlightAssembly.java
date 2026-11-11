@@ -81,6 +81,18 @@ public final class ConnectedFlightAssembly {
         if(graph!=null)for(var l:graph.links.values())if(l.first==null && g.bodies.contains(l.second) || l.second==null && g.bodies.contains(l.first))frames++;
         return "assemblyShips="+g.ships.size()+" externalAnchor="+g.external+" worldFrameJoints="+frames;
     }
+    /** Use the whole connected assembly, not player velocity or a rotor's individual velocity. */
+    public static boolean notDescending(SubLevel ship) {
+        var g=group(ship);if(g.external || g.ships.isEmpty())return false;
+        double mass=0,momentum=0;
+        for(var s:g.ships){double m=s.getSelfMassTracker().getMass();
+            if(s.isRemoved() || !(m>0) || !Double.isFinite(m))return false;
+            var system=dev.ryanhcode.sable.api.sublevel.SubLevelContainer.getContainer(s.getLevel()).physicsSystem();
+            if(!system.getPhysicsHandle(s).isValid())return false;
+            momentum+=m*system.getPipeline().getLinearVelocity(s,new org.joml.Vector3d()).y;mass+=m;
+        }
+        return HighAltitudePolicy.mayCruise(momentum/mass);
+    }
     public static boolean connected(SubLevel ship){return group(ship).ships.size()>1;}
     public static synchronized double currentMinY(SubLevel ship) {
         var group=group(ship);
