@@ -1,5 +1,8 @@
 # Descending ships retain real terrain — 1.1.5-diagnostic
 
+Updated in [1.1.7](descent-speed-117.md): only descent faster than the configurable
+40 blocks/s limit ends the exemption. The original behavior below is historical.
+
 A ship above the high-altitude threshold used to suppress terrain requests even
 while descending after an Around Planet reentry. This could replace newly loaded
 real player chunks with temporary air chunks while native physics also skipped

@@ -19,9 +19,10 @@ ship optimization with temporary air chunks. Connected sublevels, including swiv
 bearing assemblies, share passenger protection and use their lowest hull for
 altitude eligibility. Occupied high assemblies now survive native holding-column
 retirement when temporary terrain unloads, without pinning those terrain chunks.
-[Unload fix and diagnostics](docs/occupied-holding-unload-116.md). Descending assemblies resume real player chunks and native
-terrain tickets immediately, even above the altitude threshold. See
-[the descent fix](docs/descent-loading-115.md). Create, Aeronautics, AeroWorks and
+[Unload fix and diagnostics](docs/occupied-holding-unload-116.md). Assemblies descending faster than 40 blocks/s resume real player chunks and native
+terrain tickets immediately, even above the altitude threshold. Slower descent
+remains eligible. The threshold is configurable; see
+[the descent speed limit](docs/descent-speed-117.md). Create, Aeronautics, AeroWorks and
 AeroUtils are not required. The mod registers no blocks, items or creative tabs.
 
 ## Configuration

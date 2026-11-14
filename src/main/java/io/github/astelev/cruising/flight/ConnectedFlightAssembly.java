@@ -82,6 +82,7 @@ public final class ConnectedFlightAssembly {
         return "assemblyShips="+g.ships.size()+" externalAnchor="+g.external+" worldFrameJoints="+frames;
     }
     /** Use the whole connected assembly, not player velocity or a rotor's individual velocity. */
+    /** Slow descent is allowed; preserve the method name for optional integrations. */
     public static boolean notDescending(SubLevel ship) {
         var g=group(ship);if(g.external || g.ships.isEmpty())return false;
         double mass=0,momentum=0;
@@ -91,7 +92,7 @@ public final class ConnectedFlightAssembly {
             if(!system.getPhysicsHandle(s).isValid())return false;
             momentum+=m*system.getPipeline().getLinearVelocity(s,new org.joml.Vector3d()).y;mass+=m;
         }
-        return HighAltitudePolicy.mayCruise(momentum/mass);
+        return HighAltitudePolicy.mayCruise(momentum/mass,FlightConfig.MAX_DESCENT_SPEED.get());
     }
     /** Keep occupied sky assemblies native when their ordinary terrain holding column retires.
      * This is a transient unload decision, not a terrain or persistent force-load ticket. */

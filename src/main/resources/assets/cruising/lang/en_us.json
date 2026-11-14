@@ -1,4 +1,5 @@
 {
+  "cruising.configuration.maxDescentSpeed": "Maximum descent speed (blocks/s)",
   "cruising.configuration.title": "Aeronautics: Cruising Speed",
   "cruising.configuration.enabled": "Enable",
   "cruising.configuration.distantHorizonsFlight": "Distant Horizons and biome surface",
