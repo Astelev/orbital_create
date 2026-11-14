@@ -21,6 +21,7 @@ public final class CruisingSpeed {
         modEventBus.addListener(TemporaryViewPayload.Registration::register);
         modContainer.registerConfig(ModConfig.Type.SERVER,FlightConfig.SPEC);
         modContainer.registerConfig(ModConfig.Type.CLIENT,DhFlightConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.COMMON,io.github.astelev.cruising.compat.dh.progressive.ProgressiveConfig.SPEC);
         if(ModList.get().isLoaded("sable")) {
             modEventBus.addListener((net.neoforged.neoforge.event.RegisterGameTestsEvent event) ->
                     event.register(io.github.astelev.cruising.gametest.SableFlightGameTests.class));

@@ -17,7 +17,12 @@ above the configured altitude, without Sable, Create or Aeronautics.
 **Sable 2.0.6** additionally enables the existing server/client high-altitude
 ship optimization with temporary air chunks. Connected sublevels, including swivel
 bearing assemblies, share passenger protection and use their lowest hull for
-altitude eligibility. Create, Aeronautics, AeroWorks and
+altitude eligibility. Occupied high assemblies now survive native holding-column
+retirement when temporary terrain unloads, without pinning those terrain chunks.
+[Unload fix and diagnostics](docs/occupied-holding-unload-116.md). Assemblies descending faster than 40 blocks/s resume real player chunks and native
+terrain tickets immediately, even above the altitude threshold. Slower descent
+remains eligible. The threshold is configurable; see
+[the descent speed limit](docs/descent-speed-117.md). Create, Aeronautics, AeroWorks and
 AeroUtils are not required. The mod registers no blocks, items or creative tabs.
 
 ## Configuration
@@ -81,3 +86,24 @@ Optional runtime checks:
 
 `integrationRuntime` adds the pinned Sable/Create/Aeronautics test dependencies;
 they are not bundled in the mod. Development smoke-test code is not in the JAR.
+
+Cruising 1.1.0 переносит прогрессивную генерацию DH из around_planet: грубое
+покрытие 8 → 4 → 2 → 1 без снижения детализации уже готовых LOD. Настройки
+`dhProgressive` находятся в `config/cruising-common.toml`. При совместном
+использовании обновите around_planet до 0.10.1, чтобы исключить двойную очередь.
+
+Диагностическая версия 1.1.1: [тест этапов генерации чанков](docs/chunk-generation-profile.md).
+Замеры включены по умолчанию; строки `[CRUISING-GEN-PROFILE]` показывают
+фазы DH, CPU рабочих потоков, освещение, чтение чанков и преобразование в LOD.
+
+1.1.2-diagnostic сохраняет качество готовых LOD, но возвращает ограничение
+новой подробной генерации при быстром высотном полёте. `[CRUISING-FLIGHT]`
+показывает условия высотного режима и реальные/пропущенные билеты земли.
+
+1.1.3-diagnostic исправляет отключение высотного режима при управлении посохом
+или его фиксации: мировой конец управляющего шарнира больше не считается
+неизвестным физическим телом. [Причина и проверки](docs/flight-world-frame-113.md).
+
+1.1.4-diagnostic исправляет остановку грубого покрытия при 128 отложенных
+уточнениях и очищает потерявшие потребителей ожидающие стадии.
+[Устройство очереди и ограничения](docs/dh-preview-reserve-114.md).

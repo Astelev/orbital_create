@@ -95,14 +95,17 @@ public abstract class PhysicsChunkTicketManagerMixin {
             return;
         }
 
-        if (HighAltitudePolicy.maySkipTerrainTicket(
+        if (ConnectedFlightAssembly.notDescending(ship) && HighAltitudePolicy.maySkipTerrainTicket(
                 FlightConfig.ENABLED.getAsBoolean(),
                 level.dimension().equals(Level.OVERWORLD),
                 container.inBounds(x, z),
                 ConnectedFlightAssembly.currentMinY(ship),
                 level.getMaxBuildHeight(),
                 FlightConfig.MIN_ALTITUDE.getAsInt())) {
+            io.github.astelev.cruising.flight.FlightHooks.noteShipTicket(true);
             ci.cancel();
+        } else {
+            if(!container.inBounds(x,z))io.github.astelev.cruising.flight.FlightHooks.noteShipTicket(false);
         }
     }
 }

@@ -3,10 +3,8 @@ package io.github.astelev.cruising.client;
 import io.github.astelev.cruising.CruisingSpeed;
 import io.github.astelev.cruising.compat.dh.DhFlightConfig;
 import io.github.astelev.cruising.compat.dh.DhFlightState;
-import io.github.astelev.cruising.compat.dh.FlightLodPolicy;
 import io.github.astelev.cruising.compat.dh.FallbackBiomeColors;
 import net.minecraft.client.Minecraft;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
@@ -19,10 +17,9 @@ import java.util.Locale;
 
 @EventBusSubscriber(modid = CruisingSpeed.MODID, value = Dist.CLIENT)
 public final class DhFlightController {
-    private static Settings settings;
-    private static FlightLodPolicy policy;
-    private static Vec3 lastPosition;
-    private static long lastSampleMillis;
+    private static io.github.astelev.cruising.compat.dh.FlightLodPolicy generationPolicy;
+    private static String generationSettings;
+    private static final io.github.astelev.cruising.compat.dh.FlightMotionSampler motionSampler=new io.github.astelev.cruising.compat.dh.FlightMotionSampler();
     private static long lastLogMillis;
     private static volatile boolean active;
     private static double speed;
@@ -38,30 +35,26 @@ public final class DhFlightController {
                 && (ClientFlightView.isActive(mc.level) || mc.gameRenderer.getMainCamera().getPosition().y > DhFlightConfig.ADAPT_ABOVE_Y.getAsInt());
         if (!active) {
             DhFlightState.publish(false, 0);
-            lastPosition = null;
-            policy = null;
+            motionSampler.reset();generationPolicy=null;
             return;
-        }
-        var currentSettings = new Settings(DhFlightConfig.COARSE_DETAIL.getAsInt(), DhFlightConfig.FAST_SPEED.get(),
-                DhFlightConfig.QUIET_SECONDS.getAsInt(), DhFlightConfig.REFINE_SECONDS.getAsInt());
-        if (policy == null || !currentSettings.equals(settings)) {
-            settings = currentSettings;
-            policy = new FlightLodPolicy(settings.detail, settings.speed, settings.quiet * 1000L, settings.refine * 1000L);
         }
         long now = System.nanoTime() / 1_000_000L;
         var position = mc.gameRenderer.getMainCamera().getPosition();
-        speed = lastPosition == null || now <= lastSampleMillis ? 0 : position.distanceTo(lastPosition) * 1000.0 / (now - lastSampleMillis);
-        var travel = position;
-        if (lastPosition != null && now > lastSampleMillis && DhFlightConfig.FORWARD_PRIORITY.getAsBoolean()) {
-            double scale = 1000.0 / (now - lastSampleMillis);
-            DhFlightState.travelVelocity((travel.x - lastPosition.x) * scale, (travel.z - lastPosition.z) * scale);
-        } else DhFlightState.travelVelocity(0, 0);
-        lastPosition = position;
-        lastSampleMillis = now;
-        DhFlightState.publish(true, policy.sample(true, speed, now));
+        var motion=motionSampler.sample(position.x,position.y,position.z,now);speed=motion.speed();
+        DhFlightState.travelVelocity(DhFlightConfig.FORWARD_PRIORITY.getAsBoolean()?motion.xVelocity():0,
+                DhFlightConfig.FORWARD_PRIORITY.getAsBoolean()?motion.zVelocity():0);
+        String config=DhFlightConfig.COARSE_DETAIL.getAsInt()+":"+DhFlightConfig.FAST_SPEED.get()+":"+DhFlightConfig.QUIET_SECONDS.getAsInt()+":"+DhFlightConfig.REFINE_SECONDS.getAsInt();
+        if(generationPolicy==null || !config.equals(generationSettings)) {
+            generationSettings=config;generationPolicy=new io.github.astelev.cruising.compat.dh.FlightLodPolicy(
+                    DhFlightConfig.COARSE_DETAIL.getAsInt(),DhFlightConfig.FAST_SPEED.get(),DhFlightConfig.QUIET_SECONDS.getAsInt()*1000L,DhFlightConfig.REFINE_SECONDS.getAsInt()*1000L);
+        }
+        int generationFloor=generationPolicy.sample(true,speed,now);
+        generationFloor=io.github.astelev.cruising.compat.dh.progressive.ProgressiveConfig.enabled()
+                ?Math.min(generationFloor,io.github.astelev.cruising.compat.dh.progressive.ProgressiveConfig.INITIAL_DETAIL.getAsInt()):0;
+        DhFlightState.publish(true,generationFloor);
         if (DhFlightConfig.DIAGNOSTICS.getAsBoolean() && now - lastLogMillis >= 30_000) {
             lastLogMillis = now;
-            CruisingSpeed.LOGGER.info("Flight LOD: minimum cell={} blocks, cameraSpeed={} blocks/s, DH generation gate={}, {}",
+            CruisingSpeed.LOGGER.info("Flight LOD: native render detail, new generation cell={} blocks, cameraSpeed={} blocks/s, DH generation gate={}, {}",
                     1 << DhFlightState.minimumDetail(), Math.round(speed), DhFlightState.recentGate(), serverTiming());
         }
     }
@@ -69,7 +62,7 @@ public final class DhFlightController {
     @SubscribeEvent
     public static void debugText(CustomizeGuiOverlayEvent.DebugText event) {
         if (active && DhFlightConfig.DIAGNOSTICS.getAsBoolean()) {
-            event.getLeft().add("CruisingSpeed LOD: min cell " + (1 << DhFlightState.minimumDetail())
+            event.getLeft().add("CruisingSpeed LOD: native render; generation floor " + (1 << DhFlightState.minimumDetail())
                     + " blocks; DH gate " + DhFlightState.recentGate());
             event.getLeft().add("CruisingSpeed " + serverTiming());
             if (DhFlightConfig.FALLBACK_PLANE.getAsBoolean() && DhFlightConfig.FALLBACK_BIOMES.getAsBoolean()) {
@@ -91,5 +84,4 @@ public final class DhFlightController {
         return String.format(Locale.ROOT, "server avg %.1f ms / p99 %.1f ms (DH limits: 25 / 50)", average, p99);
     }
 
-    private record Settings(int detail, double speed, int quiet, int refine) {}
 }
